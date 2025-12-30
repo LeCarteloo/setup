@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import fs from "node:fs";
+import path from "node:path";
 import {
 	intro,
 	isCancel,
@@ -8,11 +10,9 @@ import {
 	outro,
 	spinner,
 } from "@clack/prompts";
-import { execa } from "execa";
-import { existsSync } from "fs";
 import pc from "picocolors";
 
-intro("Env setup");
+intro("Tools setup");
 
 if (process.getuid && process.getuid() !== 0) {
 	log.error(
@@ -21,15 +21,23 @@ if (process.getuid && process.getuid() !== 0) {
 	process.exit(1);
 }
 
+const modulesDir = path.resolve("./modules");
+const moduleFiles = fs
+	.readdirSync(modulesDir)
+	.filter((f) => f.endsWith(".mjs"));
+
+const options = moduleFiles.map((file) => {
+	const value = file.replace(/\.mjs$/, "").replace(/_/g, "-");
+	const label = value
+		.split("-")
+		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(" ");
+	return { value, label };
+});
+
 const selections = await multiselect({
 	message: "Select what you want to install",
-	options: [
-		{ value: "zsh", label: "zsh" },
-		{ value: "ohmyzsh", label: "Oh My Zsh" },
-		{ value: "brew", label: "Homebrew (Linuxbrew)" },
-		{ value: "node-brew", label: "Node.js (via Homebrew)" },
-		{ value: "go", label: "Go" },
-	],
+	options,
 });
 
 if (isCancel(selections) || selections.length === 0) {
@@ -37,105 +45,17 @@ if (isCancel(selections) || selections.length === 0) {
 	process.exit(0);
 }
 
-// Helper functions
-const run = (cmd, args) => execa(cmd, args, { stdio: "inherit" });
-const existsCommand = async (cmd) => {
-	try {
-		await execa(cmd, ["--version"]);
-		return true;
-	} catch {
-		return false;
-	}
-};
-const getCommandVersion = async (cmd) => {
-	try {
-		const { stdout } = await execa(cmd, ["--version"]);
-		return stdout.trim();
-	} catch {
-		return "unknown";
-	}
-};
-
 const s = spinner();
 
 for (const item of selections) {
-	switch (item) {
-		case "zsh":
-			if (await existsCommand("zsh")) {
-				log.info("zsh already installed, skipping");
-				break;
-			}
-
-			s.start("Installing zsh");
-			try {
-				await run("apt-get", ["install", "-y", "-qq", "zsh"], {
-					stdio: ["ignore", "ignore", "ignore"],
-				});
-				s.stop("zsh installed");
-			} catch (err) {
-				s.stop("Failed to install zsh");
-				log.error("Error installing zsh: " + err.message);
-			}
-			break;
-
-		// FIXME: This require some more work
-		case "ohmyzsh": {
-			const ohMyZshPath = `${process.env.HOME}/.oh-my-zsh`;
-			if (existsSync(ohMyZshPath)) {
-				log.info(".oh-my-zsh already exists, skipping");
-				break;
-			}
-
-			try {
-				s.start("Installing Oh My Zsh");
-				await run(
-					"sh",
-					[
-						"-c",
-						"RUNZSH=no KEEP_ZSHRC=yes CHSH=no curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh | sh > /dev/null 2>&1",
-					],
-					{
-						stdio: ["ignore", "ignore", "ignore"],
-					},
-				);
-				s.stop("Oh My Zsh installed");
-			} catch (err) {
-				s.stop("Failed to install Oh My Zsh");
-				log.error("Error installing Oh My Zsh: " + err.message);
-			}
-			break;
-		}
-
-		case "brew":
-			if (await existsCommand("brew")) {
-				log.info("Homebrew already installed, skipping");
-				break;
-			}
-			try {
-				s.start("Installing Homebrew");
-				await run("sh", [
-					"-c",
-					"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)",
-				]);
-				s.stop("Homebrew installed");
-			} catch (err) {
-				s.stop("Failed to install Homebrew");
-				log.error("Error installing Homebrew" + err.message);
-			}
-			break;
-
-		case "go":
-			if (await existsCommand("go")) {
-				const version = await getCommandVersion("go");
-				log.info(`Go already installed (${version}), skipping`);
-				break;
-			}
-			s.start("Installing Go");
-			await run("brew", ["install", "go"]);
-			s.stop();
-			log.success("Go installed");
-			break;
+	try {
+		const modulePath = new URL(`./modules/${item}.mjs`, import.meta.url)
+			.pathname;
+		const mod = await import(modulePath);
+		await mod.default(s);
+	} catch (err) {
+		log.error(`Failed to run module "${item}": ${err.message}`);
 	}
 }
 
-outro(pc.green("Setup complete"));
+outro(pc.green("Tools setup complete"));
