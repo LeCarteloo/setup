@@ -67,6 +67,7 @@ if (isCancel(selections) || selections.length === 0) {
 
 const s = spinner();
 
+// FIXME: Error handling
 for (const item of selections) {
 	try {
 		const mod = options.find((opt) => opt.value === item);
