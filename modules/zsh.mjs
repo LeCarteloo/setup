@@ -1,6 +1,8 @@
 import { log } from "@clack/prompts";
 import { existsCommand, run } from "../utils/index.mjs";
 
+export const type = "cli";
+
 export default async function install(s) {
 	if (await existsCommand("zsh", "--version")) {
 		log.info("zsh already installed, skipping");

@@ -1,6 +1,8 @@
 import { log } from "@clack/prompts";
 import { existsCommand, getCommandVersion, run } from "../utils/index.mjs";
 
+export const type = "language";
+
 export default async function install(s) {
 	if (await existsCommand("go", "version")) {
 		const version = await getCommandVersion("go", "version");

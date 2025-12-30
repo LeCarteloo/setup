@@ -2,6 +2,8 @@ import { existsSync } from "node:fs";
 import { log } from "@clack/prompts";
 import { run } from "../utils/index.mjs";
 
+export const type = "cli";
+
 export default async function install(s) {
 	const ohMyZshPath = `${process.env.HOME}/.oh-my-zsh`;
 	if (existsSync(ohMyZshPath)) {
